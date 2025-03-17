@@ -2,8 +2,8 @@ import collections
 import pymorphy3
 
 # Пути до файлов с индексами
-index_file = '../task_1/index.txt'  # Файл с URL
-indexes_file = './inverted_indexs.txt'  # Файл с инвертированным индексом
+INDEX = '../task_1/index.txt'  # Файл с URL
+INDEXS = './inverted_indexs.txt'  # Файл с инвертированным индексом
 
 # Кодировка
 UTF_8 = 'utf-8'
@@ -20,7 +20,7 @@ def init_indexes():
     lemma_indexes = collections.defaultdict(set)  # Индексы для лемм
 
     # Загружаем инвертированные индексы из файла
-    with open(indexes_file, 'r', encoding=UTF_8) as file:
+    with open(INDEXS, 'r', encoding=UTF_8) as file:
         lines = file.readlines()
         for line in lines:
             elements = line.split()
@@ -32,7 +32,7 @@ def init_indexes():
 
     # Загружаем URL-ы из файла
     urls = collections.defaultdict(str)
-    with open(index_file, 'r', encoding=UTF_8) as file:
+    with open(INDEX, 'r', encoding=UTF_8) as file:
         lines = file.readlines()
         for line in lines:
             elements = line.split()
@@ -104,7 +104,6 @@ def search_query(morphy, query, lemma_indexes, all_indexes):
 
 
 def main():
-    """Основная функция поиска"""
     lemma_indexes, urls, all_indexes = init_indexes()  # Инициализируем индексы и URL-ы
     morphy = pymorphy3.MorphAnalyzer()  # Инициализация морфологического анализатора
 
