@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 # Основной сайт и раздел новостей
 BASE_URL = 'https://www.banki.ru'
-NEWS_SECTION = '/news/'
+NEWS_SECTION = '/news/research/'
 NEWS_URL = BASE_URL + NEWS_SECTION
 HTML_SUFFIX = '.html'
 
