@@ -1,82 +1,88 @@
-import os
-import re
 import collections
-import ssl
-
 import nltk
+import os
 import pymorphy3
-
 from bs4 import BeautifulSoup
 
 # Пути до папки с html страницами и файлов
 SOURCE_DIR = '../task_1/pages'
 INDEX_OUTPUT = './inverted_indexs.txt'
 
+EXCLUDED_TOKENS = {
+    'NUMB', 'ROMN', 'PNCT', 'PREP', 'CONJ', 'PRCL', 'INTJ', 'LATN', 'UNKN'
+}
+
 # Кодировка
 ENCODING = 'utf-8'
 LANG_RUSSIAN = 'russian'
 
 
-def extract_text_from_html(directory_path):
-    """Чтение и извлечение текста из HTML файла"""
-    full_text = []
-    for file_name in os.listdir(directory_path):
-        file_path = os.path.join(directory_path, file_name)
+def get_index(filename):
+    """Извлечение числового идентификатор из имени файла"""
+    return int(''.join(filter(str.isdigit, filename)))
+
+
+def get_text(directory):
+    """Считывание текста из HTML-файлов и возвращение их в виде словаря"""
+    texts = collections.defaultdict(str)
+
+    for filename in os.listdir(directory):
+        file_path = os.path.join(directory, filename)
+        index = get_index(filename)
+
         with open(file_path, 'r', encoding=ENCODING) as file:
             soup = BeautifulSoup(file.read(), 'html.parser')
-            full_text.append(' '.join(soup.stripped_strings))
-    return full_text
+            texts[index] = ' '.join(soup.stripped_strings)  # Извлекаем чистый текст
+
+    return texts
 
 
-def process_text_data(directory, tokenizer, stop_words_set, morph_analyzer):
-    """Обработка текста: токенизация, лемматизация и фильтрация"""
-    inverted_index = collections.defaultdict(set)
+def process_texts(directory, tokenizer, stop_words, morphy):
+    """Обработчик HTML-файлов, токенизация, лемматизация"""
+    tokens = set()
+    lemmas = collections.defaultdict(set)
+    indexes = collections.defaultdict(set)
 
-    documents = extract_text_from_html(directory)
+    texts = get_text(directory)
 
-    for doc_id, raw_text in enumerate(documents, start=1):
-        tokens_in_text = tokenizer.tokenize(raw_text)
+    for index in sorted(texts.keys()):
+        words = tokenizer.tokenize(texts[index])  # Токенизация текста
 
-        for token in tokens_in_text:
-            lower_token = token.lower()
-            if len(lower_token) < 2 or lower_token in stop_words_set:
-                continue
+        for word in words:
+            word = word.lower()
 
-            parsed_token = morph_analyzer.parse(lower_token)
-            is_digit = bool(re.compile(r'^[0-9]+$').match(lower_token))
-            is_russian = bool(re.compile(r'^[а-яА-Я]{2,}$').match(lower_token))
+            if len(word) < 2 or word in stop_words:
+                continue  # Пропускаем короткие слова и стоп-слова
 
-            if not is_russian or is_digit:
-                continue
+            morph = morphy.parse(word)
+            if any(tag in morph[0].tag for tag in EXCLUDED_TOKENS):
+                continue  # Пропускаем ненужные части речи
 
-            # Добавление токена в инвертированный индекс
-            inverted_index[lower_token].add(doc_id)
+            tokens.add(word)
 
-    return inverted_index
+            if morph[0].score >= 0.5:
+                lemma = morph[0].normal_form
+                lemmas[lemma].add(word)
+                indexes[lemma].add(index)
+
+    return tokens, lemmas, indexes
 
 
-def save_inverted_index_to_file(inverted_index, index_file):
-    """Сохраняет инвертированный индекс в файл"""
-    with open(index_file, 'w', encoding=ENCODING) as file:
-        for term, doc_ids in inverted_index.items():
-            file.write(f'{term} {" ".join(map(str, doc_ids))}\n')
+def save_indexes(indexes, filename):
+    """Сохранение построенных индексов в файл"""
+    with open(filename, 'w', encoding=ENCODING) as file:
+        for lemma, index_set in sorted(indexes.items()):
+            file.write(f'{lemma} {" ".join(map(str, sorted(index_set)))}\n')
 
 
 def main():
-    # Настройка SSL для загрузки без проверок сертификатов
-    ssl._create_default_https_context = ssl._create_unverified_context
-
-    # Загрузка ресурсов из библиотеки NLTK
     nltk.download('stopwords')
-
-    # Инициализация объектов для обработки текста
     stop_words = set(nltk.corpus.stopwords.words(LANG_RUSSIAN))
     tokenizer = nltk.tokenize.WordPunctTokenizer()
-    morph_analyzer = pymorphy3.MorphAnalyzer()
+    morphy = pymorphy3.MorphAnalyzer()
 
-    # Обрабатываем текста и сохраняем инвертированный индекс в файл
-    inverted_index = process_text_data(SOURCE_DIR, tokenizer, stop_words, morph_analyzer)
-    save_inverted_index_to_file(inverted_index, INDEX_OUTPUT)
+    tokens, lemmas, indexes = process_texts(SOURCE_DIR, tokenizer, stop_words, morphy)
+    save_indexes(indexes, INDEX_OUTPUT)
 
 
 if __name__ == '__main__':
